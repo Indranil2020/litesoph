@@ -137,8 +137,8 @@ class GpawModel:
             'lx' : {'type':DT.decimal, 'min': None, 'max': None, 'default_value': 12},
             'ly' : {'type':DT.decimal, 'min': None, 'max': None, 'default_value': 12},
             'lz' : {'type':DT.decimal, 'min': None, 'max': None, 'default_value': 12},
-            'smear' :{'type':DT.decimal, 'min': None, 'max': None, 'default_value': 0.1},    
-            'smearfn' :{'type':DT.string, 'values':["improved-tetrahedron-method","tetrahedron-method","fermi-dirac","marzari-vanderbilt"], 'default_value': 'fermi-dirac'},
+            'smear' :{'type':DT.decimal, 'min': None, 'max': None, 'default_value': 0.0},    
+            'smearfn' :{'type':DT.string, 'values':["improved-tetrahedron-method","tetrahedron-method","fermi-dirac","marzari-vanderbilt"], 'default_value': ''},
             'eigenstate': {'type': DT.decimal , 'min': None, 'max': None, 'default_value': 4e-8}
         }
 
@@ -260,10 +260,13 @@ class LaserDesignModel:
 
 def plot(x_data, y_data, x_label, y_label):
     """ returns Figure object given x and y data """
-    from matplotlib.figure import Figure  
-    figure = Figure(figsize=(5, 3), dpi=100)  
-      
-    ax = figure.add_subplot(1, 1, 1)
+    from matplotlib.figure import Figure
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(8, 6), dpi=100)  
+    # figure = Figure(figsize=(5, 3), dpi=100)  
+    ax = plt.subplot(1, 1, 1)  
+    # ax = figure.add_subplot(1, 1, 1)
     ax.plot(x_data, y_data, 'k')
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
@@ -271,8 +274,10 @@ def plot(x_data, y_data, x_label, y_label):
     ax.xaxis.set_ticks_position('bottom')
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+
+    plt.show()
  
-    return figure    
+    # return figure    
 
 
 class TextViewerModel:
