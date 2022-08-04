@@ -134,7 +134,7 @@ class NwchemTask(Task):
         else:
             path_python = self.lsconfig.get('programs', 'python')
 
-        nw_rtparse = str(path.parent /'nw_rtparse.py')
+        nw_rtparse = str(path.parent /'nwchem_read_rt.py')
         spectrum_file = str(path.parent / 'spectrum.py')
         
         dm_cmd = f'{path_python} {nw_rtparse} -x dipole -p {self.pol} -t {tag} {td_out} > {self.pol}.dat'
@@ -143,7 +143,7 @@ class NwchemTask(Task):
         
         return [dm_cmd, spec_cmd]
 
-    def create_job_script(self, np=1, remote_path=None) -> list:
+    def create_job_script(self, np=1, remote_path=None, remote=None) -> list:
 
         ifilename =  self.infile
         ofilename = self.outfile
