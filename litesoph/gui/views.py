@@ -400,8 +400,18 @@ class View(ttk.Frame):
 
         self.input_param_frame.pack(fill=tk.BOTH, anchor='n', expand=True)
         self.property_frame.pack(fill=tk.BOTH, anchor='n', expand=True)
-        self.save_button_frame.pack( fill=tk.BOTH, anchor='n',  expand=True)
+        self.save_button_frame.pack( fill=tk.BOTH, anchor='n')
         self.submit_button_frame.pack(side=tk.BOTTOM, anchor='e')
+
+    def clear_widgets(self):
+        f_list = [self.input_param_frame.winfo_children, 
+                self.property_frame.winfo_children,
+                self.submit_button_frame.winfo_children,
+                self.save_button_frame.winfo_children]
+
+        for frame in f_list:
+            for widget in frame():
+                widget.destroy()
 
     def set_sub_button_state(self,state):
         self.sublocal_Button.config(state=state)
@@ -425,11 +435,11 @@ class GroundStatePage(View):
     
     def __init__(self, parent,engine, task_name, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        
+        self.clear_widgets()
         self.myFont = font.Font(family='Helvetica', size=10, weight='bold')
         style = ttk.Style()
         notebook = ttk.Notebook(self.input_param_frame)
-        notebook.pack(fill=tk.BOTH)
+        notebook.pack(fill=tk.BOTH, expand=True)
         style.configure("TNotebook.Tab", font=('Helvetica','10'))
         #style.map("TNotebook.Tab", background=[('selected')])
         
@@ -656,7 +666,7 @@ class TimeDependentPage(View):
           
         self._default_var = {
             'strength': ['float', 1e-5],
-            'pol_var' : ['int', 0],
+            'pol_var' : ['int', 1],
             'dt': ['float'],
             'Nt': ['int'],
             'spectra': ['int', 1],
@@ -734,7 +744,7 @@ class TimeDependentPage(View):
         frame_pol = ttk.Frame(frame_additional, borderwidth=2)
         frame_pol.grid(row=1, column=0, sticky='w')
 
-        values = {"X": 0, "Y": 1, "Z": 2}
+        values = {"X": 1, "Y": 2, "Z": 3}
         for (text, value) in values.items():
             tk.Radiobutton(frame_pol, text=text, variable=self._var['pol_var'], font=myfont2(),
              justify='left',value=value).grid(row=0, column=value, ipady=5, sticky='w')
@@ -758,11 +768,11 @@ class TimeDependentPage(View):
         add_job_frame(self, self.submit_button_frame, task_name, row=1, column=9)
 
     def get_pol_list(self): 
-        if self._var['pol_var'].get() == 0:
+        if self._var['pol_var'].get() == 1:
             pol_list = [1,0,0]         
-        elif self._var['pol_var'].get() == 1:
-            pol_list = [0,1,0] 
         elif self._var['pol_var'].get() == 2:
+            pol_list = [0,1,0] 
+        elif self._var['pol_var'].get() == 3:
             pol_list = [0,0,1]                
         return pol_list
 
@@ -793,15 +803,25 @@ class TimeDependentPage(View):
             'output_freq': self._var['output_freq'].get()
         }
 
+        # td_dict_oct = {
+        #     'max_step' : self._var['Nt'].get() ,
+        #     'time_step' : self._var['dt'].get(),
+        #     'td_propagator' : 'aetrs',
+        #     'strength': self._var['strength'].get(),
+        #     'e_pol': self.pol_list,
+        #     'pol_dir': self.read_pol_dir(),
+        #     'output_freq': self._var['output_freq'].get(),
+        #     'analysis_tools': self.get_property_list()
+        #   }
         td_dict_oct = {
-            'max_step' : self._var['Nt'].get() ,
-            'time_step' : self._var['dt'].get(),
-            'td_propagator' : 'aetrs',
-            'strength': self._var['strength'].get(),
-            'e_pol': self.pol_list,
-            'pol_dir': self.read_pol_dir(),
-            'output_freq': self._var['output_freq'].get(),
-            'analysis_tools': self.get_property_list()
+            "CalculationMode": 'td',
+            "TDMaxSteps" : self._var['Nt'].get() ,
+            "TDTimeStep" : round(self._var['dt'].get()*as_to_au, 2),
+            "TDPropagator" : 'aetrs',
+            "TDDeltaStrength": self._var['strength'].get(),
+            "TDPolarizationDirection": self._var['pol_var'].get(),
+            "TDOutputComputeInterval": self._var['output_freq'].get(),
+            "TDOutput": self.get_td_out()
           }
 
         if self.engine == 'gpaw':
@@ -822,11 +842,23 @@ class TimeDependentPage(View):
 
     def get_property_list(self):
         prop_list = []
+               
         if self._var['ksd'].get() == 1:
             prop_list.append("ksd")
         if self._var['popln'].get() == 1:
             prop_list.append("population_correlation")    
-        return prop_list       
+        return prop_list   
+
+    def get_td_out(self):
+
+        ksd = (self._var['ksd'].get() == 1)
+        population = (self._var['popln'].get() == 1)
+        td_occup = [ksd, population]
+
+        td_out_list = []
+        if any(td_occup):
+            td_out_list.append(["td_occup"])
+        return td_out_list
         
     def out_print(self):
         p_list = ['dipole'] 
@@ -1010,6 +1042,9 @@ class LaserDesignPage(View):
         Save_button['font'] = myFont
         Save_button.grid(row=0, column=2, sticky='nsew', padx=5, pady=5)
 
+        self.label_msg = tk.Label(self.Frame_button1,text="",fg="black")
+        self.label_msg['font'] = myFont
+        self.label_msg.grid(row=0, column=3, sticky='nsew', padx=5, pady=5)
 
         add_job_frame(self, self.SubFrame3,self.task_name, row= 0, column=0)
         
@@ -1056,7 +1091,7 @@ class LaserDesignPage(View):
 
     def get_parameters(self):
         
-        from litesoph.utilities.units import au_to_fs,autime_to_eV
+        from litesoph.utilities.units import au_to_fs,autime_to_eV, as_to_au
         laser_param = self.laser_design_dict 
         self.pol_list, pol = self.get_pol_list()              
         # epol_list = [int(self.pol_x.get()),int(self.pol_y.get()),int(self.pol_z.get())]
@@ -1092,13 +1127,28 @@ class LaserDesignPage(View):
             return td_gpaw
             
         elif self.engine == 'octopus':
-            td_oct = {  'e_pol' :self.pol_list,
-                        'max_step' : self.ns.get(),
-                        'time_step': self.ts.get(),
-                        'strength' : self.strength.get(),
-                        'time0' :laser_param['time0'],
-                        'sigma' : laser_param['sigma'],
-                        'frequency': self.frequency.get()
+            # td_oct = {  'e_pol' :self.pol_list,
+            #             'max_step' : self.ns.get(),
+            #             'time_step': self.ts.get(),
+            #             'strength' : self.strength.get(),
+            #             'time0' :laser_param['time0'],
+            #             'sigma' : laser_param['sigma'],
+            #             'frequency': self.frequency.get()
+            #         }
+            td_oct = { 
+                'CalculationMode': 'td', 
+                'TDPropagator': 'aetrs',
+                'TDMaxSteps' : self.ns.get(),
+                'TDTimeStep': round(self.ts.get()*as_to_au, 2),
+                'TDFunctions': [[str('"'+"envelope_gauss"+'"'),'tdf_gaussian',
+                                self.strength.get(),
+                                laser_param['sigma'],laser_param['time0']
+                                ]],                
+                'TDExternalFields': [['electric_field',
+                                    self.pol_list[0],self.pol_list[1],self.pol_list[2],
+                                    str(self.frequency.get())+"*eV",
+                                    str('"'+"envelope_gauss"+'"')
+                                    ]]
                     }
             # print(td_oct)            
             return td_oct        
@@ -1132,8 +1182,8 @@ class LaserDesignPage(View):
     def back_button(self):
         self.event_generate('<<ShowWorkManagerPage>>')
 
-    # def set_label_msg(self,msg):
-    #     show_message(self.label_msg, msg) 
+    def set_label_msg(self,msg):
+        show_message(self.label_msg, msg) 
 
    
 
@@ -1290,10 +1340,17 @@ class PlotSpectraPage(ttk.Frame):
             'e_min': self._var['e_min'].get()       
         }
         
+        # td_dict_oct = {
+        #     'del_e':self._var['del_e'].get(),
+        #     'e_max':self._var['e_max'].get(),
+        #     'e_min': self._var['e_min'].get()
+        #   }
+        
         td_dict_oct = {
-            'del_e':self._var['del_e'].get(),
-            'e_max':self._var['e_max'].get(),
-            'e_min': self._var['e_min'].get()
+            "UnitsOutput": 'eV_angstrom',
+            "PropagationSpectrumEnergyStep": str(self._var['del_e'].get())+"*eV",
+            "PropagationSpectrumMaxEnergy": str(self._var['e_max'].get())+"*eV",
+            "PropagationSpectrumMinEnergy": str(self._var['e_min'].get())+"*eV"
           }
         
         if self.engine == 'gpaw':
@@ -1595,27 +1652,22 @@ class JobSubPage(ttk.Frame):
         self.processors.set(1)
         self.port.set(22)
         self.Frame1 = ttk.Frame(self, borderwidth=2, relief='groove')
-        self.Frame1.grid(row=1,column=0, columnspan=4, rowspan=100, sticky='nsew')
+        self.Frame1.pack(fill=tk.BOTH)
         self.frame_button = ttk.Frame(self, borderwidth=2, relief='groove')
-        self.frame_button.grid(row=101, column=0,columnspan=5, sticky='nswe')
-        self.sub_job_frame = ttk.Frame(self.Frame1)
-        self.sub_job_frame.grid(row=0, column=0, sticky='nsew')
+        self.frame_button.pack(fill=tk.BOTH)
 
-        view_option_frame = ttk.Frame(self.Frame1, borderwidth=2 ,relief='groove')
-        view_option_frame.grid(row=1,column=0, sticky='nsew', pady=15)
+        self.sub_job_frame = ttk.Frame(self.Frame1)
+        self.sub_job_frame.grid(row=1, column=0, sticky='nsew')
+
         self.show_job_frame()
 
-        self.Frame_label = tk.Label(self, text="LITESOPH Job Submission", fg='blue')
+        self.Frame_label = tk.Label(self.Frame1, text="LITESOPH Job Submission", fg='blue')
         self.Frame_label['font'] = myfont1()
-        self.Frame_label.grid(row=0, column=3)       
+        self.Frame_label.grid(row=0, column=0)       
 
-        view_btn = tk.Button(view_option_frame, text="View Output",activebackground="#78d6ff",command=lambda:[self.view_outfile(self.task)])
+        view_btn = tk.Button(self.Frame1, text="View Output",activebackground="#78d6ff",command=lambda:[self.view_outfile(self.task)])
         view_btn['font'] = myfont()
-        view_btn.grid(row=10, column=1)
-
-        self.Frame_label = tk.Label(self, text="LITESOPH Job Submission", fg='blue')
-        self.Frame_label['font'] = myfont1()
-        self.Frame_label.grid(row=0, column=3)         
+        view_btn.grid(row=2, column=0, sticky='e', pady=5)
 
         back = tk.Button(self.frame_button, text="Back ",activebackground="#78d6ff",command=lambda:[self.event_generate(f'<<Show{self.task}Page>>')])
         back['font'] = myfont()
@@ -1672,11 +1724,11 @@ class JobSubPage(ttk.Frame):
 
         save_job_script = tk.Button(self.sub_job_frame, text="Save Job Script",activebackground="#78d6ff",command = self.save_job_script)
         save_job_script['font'] = myfont()
-        save_job_script.grid(row=5,column=0,sticky='nsew', padx=2, pady=4)
+        save_job_script.grid(row=4,column=1,sticky='nsew', padx=2, pady=4)
 
         self.run_button = tk.Button(self.sub_job_frame, text="Run Job",activebackground="#78d6ff",command=lambda:[self.submitjob_local()])
         self.run_button['font'] = myfont()
-        self.run_button.grid(row=4, column=1, pady=5)        
+        self.run_button.grid(row=5, column=0,sticky='nsew', pady=5)        
 
     def show_run_network(self):
         """ Creates Network JobSub input widgets""" 
@@ -1748,11 +1800,11 @@ class JobSubPage(ttk.Frame):
 
         save_job_script = tk.Button(self.sub_job_frame, text="Save Job Script",activebackground="#78d6ff",command = self.save_job_script)
         save_job_script['font'] = myfont()
-        save_job_script.grid(row=10,column=0,sticky='nsew', padx=2, pady=4)
+        save_job_script.grid(row=9,column=1,sticky='nsew', padx=2, pady=4)
 
         self.run_button = tk.Button(self.sub_job_frame, text="Run Job",activebackground="#78d6ff", command=lambda:[self.submitjob_network()])
         self.run_button['font'] = myfont()
-        self.run_button.grid(row=9,column=1,sticky='nsew', padx=2, pady=4)    
+        self.run_button.grid(row=10,column=0,sticky='nsew', padx=2, pady=4)    
 
     def _sub_command_option(self, *_):
         if self.sub_job_type.get() == 0:
