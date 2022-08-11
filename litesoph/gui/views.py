@@ -8,7 +8,7 @@ import pathlib
 
 from numpy import append
 
-from litesoph.gui import images
+from litesoph.gui import actions, images
 from litesoph.simulations.project_status import show_message
 from litesoph.gui.input_validation import Onlydigits, Decimalentry
 from litesoph.gui.visual_parameter import myfont, myfont1, myfont2, label_design, myfont15
@@ -90,7 +90,7 @@ class StartPage(ttk.Frame):
         canvas_for_project_create.image = ImageTk.PhotoImage(image_project_create.resize((50,50), Image.ANTIALIAS))
         canvas_for_project_create.create_image(0,0, image=canvas_for_project_create.image, anchor='nw')
 
-        button_create_project = tk.Button(mainframe,text="Start LITESOPH Project", activebackground="#78d6ff",command=lambda: self.event_generate('<<ShowWorkManagerPage>>'))
+        button_create_project = tk.Button(mainframe,text="Start LITESOPH Project", activebackground="#78d6ff",command=lambda: self.event_generate(actions.SHOW_WORK_MANAGER_PAGE))
         button_create_project['font'] = myFont
         button_create_project.place(x=80,y=200)
 
@@ -306,21 +306,21 @@ class WorkManagerPage(ttk.Frame):
         self.entry_proj.config(textvariable=self._var['proj_name'])
 
     def _open_project(self):
-        self.event_generate('<<OpenExistingProject>>')
+        self.event_generate(actions.OPEN_PROJECT)
 
     def _create_project(self):
-        self.event_generate('<<CreateNewProject>>')
+        self.event_generate(actions.CREATE_NEW_PROJECT)
 
     def _get_geometry_file(self):
-        self.event_generate('<<GetMolecule>>')
+        self.event_generate(actions.GET_MOLECULE)
         
     def _geom_visual(self):
-        self.event_generate('<<VisualizeMolecule>>')
+        self.event_generate(actions.VISUALIZE_MOLECULE)
 
     def proceed_button(self):
         """ event generate on proceed button"""
 
-        self.event_generate('<<SelectProceed>>')   
+        self.event_generate(actions.ON_PROCEED)   
 
     def show_upload_label(self):
         show_message(self.message_label,"Uploaded")
@@ -594,7 +594,7 @@ class GroundStatePage(View):
         self.box_shape.grid(row=0, column=1, sticky='w', padx=10, pady=2) 
 
     def back_button(self):
-        self.event_generate('<<ShowWorkManagerPage>>')              
+        self.event_generate(actions.SHOW_WORK_MANAGER_PAGE)              
 
     def get_parameters(self):
 
@@ -876,7 +876,7 @@ class TimeDependentPage(View):
         self.event_generate(f'<<Generate{self.task_name}Script>>')
 
     def back_button(self):
-        self.event_generate('<<ShowWorkManagerPage>>')
+        self.event_generate(actions.SHOW_WORK_MANAGER_PAGE)
 
     def update_var(self, default_dict:dict):
         for key, value in default_dict.items():
@@ -1170,17 +1170,8 @@ class LaserDesignPage(View):
             'print': ['dipole', 'moocc' if self.popln_var.get() == 1 else '']}}
             return td_nwchem
 
-    def save_button(self):
-        self.event_generate('<<SaveRT_TDDFT_LASERScript>>')          
-
-    def view_button(self):
-        self.event_generate('<<ViewRT_TDDFT_LASERScript>>')
-
-    def run_job_button(self):
-        self.event_generate('<<SubRT_TDDFT_LASER>>')
-
     def back_button(self):
-        self.event_generate('<<ShowWorkManagerPage>>')
+        self.event_generate(actions.SHOW_WORK_MANAGER_PAGE)
 
     def set_label_msg(self,msg):
         show_message(self.label_msg, msg) 
@@ -1189,9 +1180,10 @@ class LaserDesignPage(View):
 
 class PlotSpectraPage(ttk.Frame):
 
-    def __init__(self, parent, engine, *args, **kwargs):
+    def __init__(self, parent, engine,task_name, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.engine = engine
+        self.task_name = task_name
         
         self._default_var = {
             'del_e' : ['float', 0.05],
@@ -1225,7 +1217,7 @@ class PlotSpectraPage(ttk.Frame):
 
         self.Frame1.grid(row=0,column=0, sticky='nsew')
 
-        self.add_job_frame(self, "Spectrum", r=0, c=1)        
+        self.add_job_frame(self, self.task_name, r=0, c=1)        
 
         self.heading = tk.Label(self.Frame1,text="LITESOPH Spectrum Calculations and Plots", fg='blue')
         self.heading['font'] = myfont()
@@ -1263,7 +1255,7 @@ class PlotSpectraPage(ttk.Frame):
         self.button_frame = ttk.Frame(self, borderwidth=2, relief='groove')
         self.button_frame.grid(row=1, column=0, sticky='nsew')
 
-        Frame_Button1 = tk.Button(self.button_frame, text="Back",activebackground="#78d6ff",command=lambda:self.event_generate('<<ShowWorkManagerPage>>'))
+        Frame_Button1 = tk.Button(self.button_frame, text="Back",activebackground="#78d6ff",command=lambda:self.event_generate(actions.SHOW_WORK_MANAGER_PAGE))
         Frame_Button1['font'] = myfont()
         Frame_Button1.grid(row=0, column=0, padx=3, pady=6)
 
@@ -1330,7 +1322,7 @@ class PlotSpectraPage(ttk.Frame):
             
 
     def show_plot(self):
-        self.event_generate("<<ShowSpectrumPlot>>")
+        self.event_generate(f"<<Show{self.task_name}Plot>>")
 
 
     def get_parameters(self):
@@ -1365,95 +1357,16 @@ class PlotSpectraPage(ttk.Frame):
             return td_dict_nwchem
         elif self.engine == 'octopus':
             return td_dict_oct            
-    
-  
 
-class DmLdPage(ttk.Frame):
-
-    def __init__(self, parent, controller, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
-        self.controller = controller
-        
-        from litesoph.utilities.units import au_to_fs
-        self.plot_task = tk.StringVar()
-        self.compo = tk.StringVar()
-
-        myFont = font.Font(family='Helvetica', size=10, weight='bold')
-
-        j=font.Font(family ='Courier', size=20,weight='bold')
-        k=font.Font(family ='Courier', size=40,weight='bold')
-        l=font.Font(family ='Courier', size=15,weight='bold')
-        
-        self.Frame = ttk.Frame(self) 
-        
-        self.Frame.place(relx=0.01, rely=0.01, relheight=0.98, relwidth=0.978)
-        self.Frame.configure(relief='groove')
-        self.Frame.configure(borderwidth="2")
-        self.Frame.configure(relief="groove")
-        self.Frame.configure(cursor="fleur")
-        
-        self.heading = tk.Label(self.Frame,text="LITESOPH Dipole Moment and laser Design", fg='blue')
-        self.heading['font'] = myFont
-        self.heading.place(x=350,y=10)
-        
-        self.label_pol = tk.Label(self.Frame, text= "Plot:",bg= "grey",fg="black")
-        self.label_pol['font'] = myFont
-        self.label_pol.place(x=10,y=60)
-
-        plot_list = ["Dipole Moment", "Dipole Moment and Laser"]
-        self.entry_pol_x = ttk.Combobox(self.Frame,textvariable=self.plot_task, value = plot_list, width = 25)
-        self.entry_pol_x['font'] = myFont
-        self.entry_pol_x.insert(0,"Dipole Moment")
-        self.entry_pol_x.place(x=280,y=60)
-        self.entry_pol_x['state'] = 'readonly'
-
-        #self.label_pol = Label(self.Frame, text= "Axis of Electric polarization:",fg="black")
-        #self.label_pol['font'] = myFont
-        #self.label_pol.place(x=10,y=110)
-
-        self.label_pol = tk.Label(self.Frame, text="Select the axis", bg= "grey",fg="black")
-        self.label_pol['font'] = myFont
-        self.label_pol.place(x=10,y=110)
-
-        com_pol = ["x component","y component","z component"]
-        self.entry_pol_x = ttk.Combobox(self.Frame, textvariable= self.compo, value = com_pol, width= 25)
-        self.entry_pol_x['font'] = myFont
-        self.entry_pol_x.insert(0,"x component")
-        self.entry_pol_x.place(x=280,y=110)
-        self.entry_pol_x['state'] = 'readonly'
-
-        self.Frame2_Button_1 = tk.Button(self.Frame,text="Plot",activebackground="#78d6ff", command=lambda:[self.plot_button()])
-        self.Frame2_Button_1['font'] = myFont
-        self.Frame2_Button_1.place(x=250,y=380)
-    
-        Frame_Button1 = tk.Button(self.Frame, text="Back",activebackground="#78d6ff",command=lambda:self.event_generate('<<ShowWorkManagerPage>>'))
-        Frame_Button1['font'] = myFont
-        Frame_Button1.place(x=10,y=380)
-        
-    def returnaxis(self):
-        if self.compo.get() == "x component":
-            axis = 2
-        if self.compo.get() == "y component":
-            axis = 3
-        if self.compo.get() == "z component":
-            axis = 4
-        return axis
-
-    def plot_button(self):
-        from litesoph.utilities.units import au_to_fs
-        if self.plot_task.get() == "Dipole Moment":
-            plot_spectra(self.returnaxis(),str(self.controller.directory)+'/TD_Laser/dmlaser.dat',str(self.controller.directory)+'/TD_Laser/dmlaser.png',"Time (fs)","Dipole moment (au)", au_to_fs)
-        if self.plot_task.get() == "Dipole Moment and Laser":
-            plot_files(str(self.controller.directory)+'/laser.dat',str(self.controller.directory)+'/TD_Laser/dmlaser.dat',1, self.returnaxis())
-   
 class TcmPage(ttk.Frame):
 
-    def __init__(self, parent, *args, **kwargs):
+    def __init__(self, parent,task_name, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
     
         self.parent = parent
         self.job = None
-        
+        self.task_name = task_name
+
         self.engine_name = tk.StringVar()
         self.min = tk.DoubleVar()
         self.max = tk.DoubleVar()
@@ -1484,12 +1397,12 @@ class TcmPage(ttk.Frame):
         self.frame_inp = ttk.Frame(self.Frame1, borderwidth=2)
         self.frame_inp.grid(row=1,column=0, sticky='nsew')           
 
-        Frame_Button1 = tk.Button(self.frame_button, text="Back",activebackground="#78d6ff",command=lambda:self.event_generate('<<ShowWorkManagerPage>>'))
+        Frame_Button1 = tk.Button(self.frame_button, text="Back",activebackground="#78d6ff",command=lambda:self.event_generate(actions.SHOW_WORK_MANAGER_PAGE))
         Frame_Button1['font'] = myfont()
         Frame_Button1.grid(row=0, column=0)
 
         self.engine_name.trace_add(['write'], lambda *_:self.select_ksd_frame(self.frame_inp))
-        self.add_job_frame("TCM")
+        self.add_job_frame(task_name)
 
     def add_gpaw_ksd_frame(self, parent):
         """ Creates widgets for gpaw ksd calculation"""    
@@ -1583,7 +1496,7 @@ class TcmPage(ttk.Frame):
         self.Frame1_Button3['font'] = myfont()
         self.Frame1_Button3.grid(row=2, column=2, padx=3, pady=6, sticky='nsew')    
 
-        self.plot_button = tk.Button(self.Frame3, text="Plot", activebackground="#78d6ff", command=lambda: self.event_generate("<<ShowTCMPlot>>"))
+        self.plot_button = tk.Button(self.Frame3, text="Plot", activebackground="#78d6ff", command=lambda: self.event_generate(f"<<Show{task_name}Plot>>"))
         self.plot_button['font'] = myfont()
         self.plot_button.grid(row=3, column=2,padx=3, pady=15, sticky='nsew')
 
@@ -1766,7 +1679,7 @@ class JobSubPage(ttk.Frame):
         back['font'] = myfont()
         back.pack(side= tk.LEFT)
 
-        back2main = tk.Button(self.frame_button, text="Back to main page",activebackground="#78d6ff",command=lambda:[self.event_generate('<<ShowWorkManagerPage>>')])
+        back2main = tk.Button(self.frame_button, text="Back to main page",activebackground="#78d6ff",command=lambda:[self.event_generate(actions.SHOW_WORK_MANAGER_PAGE)])
         back2main['font'] = myfont()
         back2main.pack(side= tk.RIGHT)
 
@@ -1916,11 +1829,8 @@ class JobSubPage(ttk.Frame):
         event = '<<Run'+self.task+'Local>>'
         self.event_generate(event)
 
-    def disable_run_button(self):
-        self.run_button.config(state='disabled')
-
-    def activate_run_button(self):
-        self.run_button.config(state='active')
+    def set_run_button_state(self, state):
+        self.run_button.config(state=state)
 
     def create_job_script(self):
         event = '<<Create'+self.task+self.job_type+'Script>>'
