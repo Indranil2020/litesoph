@@ -27,6 +27,8 @@ from litesoph.gui import actions
 from litesoph.simulations.esmd import Task
 from litesoph.gui.navigation import ProjectList, summary_of_current_project
 from litesoph.simulations.project_status import Status
+from litesoph.gui.visual_parameter import myfont, myfont1, myfont2, label_design, myfont15
+
 
 home = pathlib.Path.home()
 
@@ -155,6 +157,7 @@ class GUIAPP:
             actions.GET_MOLECULE : self._on_get_geometry_file,
             actions.VISUALIZE_MOLECULE: self._on_visualize,
             actions.CREATE_NEW_PROJECT: self._on_create_project,
+            actions.CREATE_PROJECT_WINDOW:self.create_project_window,
             actions.OPEN_PROJECT : self._on_open_project,
             actions.ON_PROCEED : self._on_proceed,
             actions.ON_BACK_BUTTON : self._on_back_button,
@@ -173,7 +176,7 @@ class GUIAPP:
             actions.SHOW_RT_TDDFT_LASER_PAGE: self._on_rt_tddft_laser_task,
             actions.SHOW_SPECTRUM_PAGE : self._on_spectra_task,
             actions.SHOW_TCM_PAGE : self._on_tcm_task,
-            actions.SHOW_MO_POPULATION_CORRELATION_PAGE : self._on_population_task
+            actions.SHOW_MO_POPULATION_CORRELATION_PAGE : self._on_mo_population_task
         }
         for event, callback in event_show_page.items():
             self.main_window.bind_all(event, callback)  
@@ -218,12 +221,15 @@ class GUIAPP:
         if self.engine:
             self._frames[v.WorkManagerPage].engine.set(self.engine)
         
-       
+    def create_project_window(self, *_):
+        self.project_window = v.CreateProjectPage(self.main_window)   
         
     def _on_create_project(self, *_):
         """Creates a new litesoph project"""
-       
-        project_name = self._frames[v.WorkManagerPage].get_value('proj_name')
+        if hasattr(self, 'self.project_window'):
+            project_name = self.project_window.get_value('proj_name')
+        else:
+            project_name = self._frames[v.WorkManagerPage].get_value('proj_name')
         
         if not project_name:
             messagebox.showerror(title='Error', message='Please set the project name.')
@@ -246,6 +252,9 @@ class GUIAPP:
             self._init_project(project_path)
             self.engine = None
             messagebox.showinfo("Message", f"project:{project_path} is created successfully")
+            if hasattr(self, 'self.project_window'):
+                self.project_window.destroy()
+
             
         
     def _on_get_geometry_file(self, *_):
@@ -472,7 +481,7 @@ class GUIAPP:
         self.spectra_view.Frame1_Button3.config(state='active')
         self.main_window.bind_all(f'<<SubLocal{task_name}>>', lambda _: self._on_spectra_run_local_button(task_name))
         self.main_window.bind_all(f'<<RunNetwork{task_name}>>', lambda _: self._on_spectra_run_network_button())
-        self.main_window.bind_all(f'<<Show{task_name}Plot>>', lambda _:self._on_spectra_plot_button())
+        self.main_window.bind_all(f'<<Show{task_name}Plot>>', lambda _:self._on_plot_button(self.spectra_view ,self.spectra_task))
 
     def _on_spectra_run_local_button(self, task_name, *_):
         
@@ -482,21 +491,13 @@ class GUIAPP:
         self.status.update_status(f'{self.engine}.{self.spectra_task.task_name}.script', 1)
         self.status.update_status(f'{self.engine}.{self.spectra_task.task_name}.param',self.spectra_task.user_input)
 
-        if self.engine == 'nwchem':
-            self.spectra_task.create_job_script()
-        else:
-            self.spectra_task.prepare_input()
+        self.spectra_task.prepare_input()
         self._run_local(self.spectra_task, np=1)
         
 
     def _on_spectra_run_network_button(self, *_):
         pass
 
-    def _on_spectra_plot_button(self, *_):
-        """ Selects engine specific plot function"""
-        self.spectra_task.plot()
-    
-        
 ##----------------------compute---tcm---------------------------------
 
     def _on_tcm_task(self, *_):
@@ -515,7 +516,7 @@ class GUIAPP:
         
         self.main_window.bind_all(f'<<SubLocal{task_name}>>', lambda _: self._on_tcm_run_local_button(task_name))
         self.main_window.bind_all(f'<<RunNetwork{task_name}>>', lambda _: self._on_tcm_run_network_button())
-        self.main_window.bind_all(f'<<Show{task_name}Plot>>', lambda _:self._on_tcm_plot_button())
+        self.main_window.bind_all(f'<<Show{task_name}Plot>>', lambda _: self._on_plot_button(self.tcm_view, self.tcm_task))
 
     def _on_tcm_run_local_button(self, task_name, *_):
         
@@ -533,20 +534,26 @@ class GUIAPP:
     def _on_tcm_run_network_button(self, *_):
         pass
 
-    def _on_tcm_plot_button(self, *_):
-        """ Selects engine specific plot function"""
-        try:
-            self.tcm_task.plot()
-        except Exception as e:
-            messagebox.showerror(title='Error', message="Error occured during plotting", detail= e)
-
 ##-------------------------------population task-------------------------------------------------------------
 
-    def _on_population_task(self, *_): 
-        task_name = 'population correlation'      
+    def _on_mo_population_task(self, *_): 
+        task_name = actions.MO_POPULATION_CORRELATION      
         self._show_frame(v.PopulationPage,self.engine, task_name)
-        self.population_view = self._frames[v.PopulationPage]
-       
+        self.mo_population_view = self._frames[v.PopulationPage]
+        self.mo_population_view.engine = self.engine
+        self.main_window.bind_all(f'<<SubLocal{task_name}>>', lambda _: self._on_mo_population_run_local_button(task_name))
+        self.main_window.bind_all(f'<<Plot{task_name}>>', lambda _:self._on_plot_button(self.mo_population_view,self.mo_population_task))
+
+    def _on_mo_population_run_local_button(self, task_name, *_):
+        
+        inp_dict = self.mo_population_view.get_parameters()
+        self.mo_population_task = get_engine_task(self.engine, task_name, self.status, self.directory, self.lsconfig, inp_dict)
+        self.status.set_new_task(self.engine, self.mo_population_task.task_name)
+        self.status.update_status(f'{self.engine}.{self.mo_population_task.task_name}.script', 1)
+        self.status.update_status(f'{self.engine}.{self.mo_population_task.task_name}.param',self.mo_population_task.user_input)
+
+        self.mo_population_task.prepare_input()
+        self._run_local(self.mo_population_task, np=1)
 ##-----------------------------------------------------------------------------------------------------------##
 
     def view_input_file(self, task:Task):
@@ -598,6 +605,24 @@ class GUIAPP:
         self.job_sub_page.bind(f'<<Save{task.task_name}Local>>',lambda _: self._on_save_job_script(task, self.job_sub_page))
         self.job_sub_page.bind(f'<<Create{task.task_name}LocalScript>>', lambda _: self._on_create_local_job_script(task, task.task_name))
     
+    def _on_plot_button(self,view, task: Task, *_):
+        
+        try:
+            get_param_func = getattr(view, 'get_plot_parameters')
+        except AttributeError:
+            pass
+        else:
+            param = get_param_func()
+        
+        try:
+            # Remove this 'if' after generalizing plot function
+            if self.engine == 'nwchem':
+                task.plot(**param)
+            else:
+                task.plot()
+        except Exception as e:
+            messagebox.showerror(title='Error', message="Error occured during plotting", detail= e)
+
     def _run_local(self, task: Task, np=None):
 
         if np:

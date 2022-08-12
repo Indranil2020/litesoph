@@ -1,11 +1,5 @@
-
-GROUND_STATE = 'ground_state'
-RT_TDDFT_DELTA = 'rt_tddft_delta'
-RT_TDDFT_LASER = 'rt_tddft_laser'
-SPECTRUM = 'spectrum'
-TCM = 'tcm'
-MO_POPULATION_CORRELATION = 'mo_population_correlation'
-
+from litesoph.simulations.esmd import (GROUND_STATE, RT_TDDFT_DELTA, RT_TDDFT_LASER,
+                                        SPECTRUM, TCM, MO_POPULATION_CORRELATION)
 
 SHOW_PAGE_EVENT = '<<Show{}Page>>'
 SHOW_WORK_MANAGER_PAGE = SHOW_PAGE_EVENT.format('WorkManager')
@@ -21,6 +15,8 @@ SHOW_MO_POPULATION_CORRELATION_PAGE = SHOW_PAGE_EVENT.format(MO_POPULATION_CORRE
 GET_MOLECULE = '<<GetMolecule>>'
 VISUALIZE_MOLECULE = '<<VisualizeMolecule>>'
 CREATE_NEW_PROJECT = '<<CreateNewProject>>' 
+CREATE_PROJECT_WINDOW = '<<create_filemenu_project>>'
+
 OPEN_PROJECT = '<<OpenExistingProject>>'
 ON_PROCEED = '<<SelectProceed>>' 
 ON_BACK_BUTTON = '<<ClickBackButton>>'

@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import *                    # importing tkinter, a standart python interface for GUI.
+
 from tkinter import ttk
 from tkinter import messagebox
 from  PIL import Image,ImageTk
@@ -10,7 +12,7 @@ from numpy import append
 
 from litesoph.gui import actions, images
 from litesoph.simulations.project_status import show_message
-from litesoph.gui.input_validation import Onlydigits, Decimalentry
+from litesoph.gui.input_validation import EntryPattern, Onlydigits, Decimalentry
 from litesoph.gui.visual_parameter import myfont, myfont1, myfont2, label_design, myfont15
 from litesoph.simulations.models import AutoModeModel
 from litesoph.gui.engine_views import get_gs_engine_page
@@ -665,7 +667,7 @@ class TimeDependentPage(View):
         myFont = font.Font(family='Helvetica', size=10, weight='bold')
           
         self._default_var = {
-            'strength': ['float', 1e-5],
+            'strength': ['float'],
             'pol_var' : ['int', 1],
             'dt': ['float'],
             'Nt': ['int'],
@@ -704,12 +706,17 @@ class TimeDependentPage(View):
         self.label_proj['font'] = myFont
         self.label_proj.grid(row=2, column=0, sticky='w', padx=5, pady=5)
 
-        inval = ["1e-5", "1e-4", "1e-3"]
-        self.entry_inv = ttk.Combobox(
-            self.input_param_frame, textvariable=self._var['strength'], value=inval)
-        self.entry_inv['font'] = myFont
-        self.entry_inv.grid(row=2, column=1)
-        self.entry_inv['state'] = 'readonly'
+        self.entry_strength = EntryPattern(self.input_param_frame, textvariable=self._var['strength'])
+        self.entry_strength['font'] = myFont
+        self.entry_strength.grid(row=2, column=1)
+        self._var['strength'].set('01e-05')
+
+        # inval = ["1e-5", "1e-4", "1e-3"]
+        # self.entry_inv = ttk.Combobox(
+        #     self.input_param_frame, textvariable=self._var['strength'], value=inval)
+        # self.entry_inv['font'] = myFont
+        # self.entry_inv.grid(row=2, column=1)
+        # self.entry_inv['state'] = 'readonly'
 
         self.label_proj = tk.Label(
             self.input_param_frame, text="Propagation time step (in attosecond)", bg="gray", fg="black")
@@ -970,13 +977,21 @@ class LaserDesignPage(View):
         self.label_strength = tk.Label(self.Frame2,text="Laser Strength in a.u (Eo)",bg="gray",fg="black")
         self.label_strength['font'] = myFont
         self.label_strength.grid(row=3, column=0, sticky='w', padx=5, pady=5)
-    
-        instr = ["1e-5","1e-4","1e-3"]
-        self.entry_strength = ttk.Combobox(self.Frame2,textvariable= self.strength, value = instr)
+
+        self.entry_strength = EntryPattern(self.Frame2,textvariable= self.strength)
         self.entry_strength['font'] = myFont
-        self.entry_strength.current(0)
         self.entry_strength.grid(row=3, column=1)
-        self.entry_strength['state'] = 'readonly'
+        self.strength.set('01e-05')
+        
+        # print(self.strength.get())
+        # self.entry_strength['state'] = 'readonly'
+    
+        # instr = ["1e-5","1e-4","1e-3"]
+        # self.entry_strength = ttk.Combobox(self.Frame2,textvariable= self.strength, value = instr)
+        # self.entry_strength['font'] = myFont
+        # self.entry_strength.current(0)
+        # self.entry_strength.grid(row=3, column=1)
+        # self.entry_strength['state'] = 'readonly'
 
         self.label_fwhm = tk.Label(self.Frame2,text="Full Width Half Max (FWHM in eV)",bg="gray",fg="black")
         self.label_fwhm['font'] = myFont
@@ -1547,8 +1562,8 @@ class PopulationPage(View):
         
         self.bandpass = tk.IntVar(value=100)
         self.hanning = tk.IntVar(value= 50)
-        self.ni = tk.IntVar()
-        self.na = tk.IntVar()
+        self.occupied_mo = tk.IntVar()
+        self.unoccupied_mo = tk.IntVar()
         self.ngrid = tk.IntVar(value=100)
         self.broadening = tk.DoubleVar(value= 0.5)
 
@@ -1568,7 +1583,7 @@ class PopulationPage(View):
         self.Label_ni['font'] = myfont()
         self.Label_ni.grid(row=1, column=0, sticky='w', padx=5, pady=5)        
         
-        self.entry_ni = Onlydigits(self.SubFrame1, textvariable= self.ni, width=5)
+        self.entry_ni = Onlydigits(self.SubFrame1, textvariable= self.occupied_mo, width=5)
         self.entry_ni['font'] = myfont()
         self.entry_ni.grid(row=1, column=1)
 
@@ -1576,7 +1591,7 @@ class PopulationPage(View):
         self.Label_na['font'] = myfont()
         self.Label_na.grid(row=2, column=0, sticky='w', padx=5, pady=5)        
         
-        self.entry_na = Onlydigits(self.SubFrame1, textvariable= self.na, width=5)
+        self.entry_na = Onlydigits(self.SubFrame1, textvariable= self.unoccupied_mo, width=5)
         self.entry_na['font'] = myfont()
         self.entry_na.grid(row=2, column=1)
 
@@ -1616,20 +1631,42 @@ class PopulationPage(View):
         self.entry_width['font'] = myfont()
         self.entry_width.grid(row=2, column=1, sticky='w', padx=5, pady=5)
 
-        self.submit_button = tk.Button(self.SubFrame1, text="Submit",activebackground="#78d6ff")
+        self.submit_button = tk.Button(self.SubFrame1, text="Submit",activebackground="#78d6ff", command=self._on_submit)
         self.submit_button['font'] = myfont()
         self.submit_button.grid(row=4, column=2, sticky='we', padx=5)
 
-        self.plot_button = tk.Button(self.SubFrame2, text="Plot",activebackground="#78d6ff")
+        self.plot_button = tk.Button(self.SubFrame2, text="Plot",activebackground="#78d6ff", command=self._on_plot)
         self.plot_button['font'] = myfont()
         self.plot_button.grid(row=2, column=2, sticky='we', padx=25)
 
-        self.back_button = tk.Button(self.Frame_button1, text="Back ",activebackground="#78d6ff")
+        self.back_button = tk.Button(self.Frame_button1, text="Back ",activebackground="#78d6ff", command = lambda _: self.event_generate(actions.SHOW_WORK_MANAGER_PAGE))
         self.back_button['font'] = myfont()
         self.back_button.grid(row=0, column=0, padx=10, sticky='nswe')
 
         # add_job_frame(self, self.SubFrame3,self.task_name, row= 0, column=1)
+    def _on_submit(self):
+        self.event_generate(f"<<SubLocal{self.task_name}>>")
 
+    def _on_plot(self):
+        self.event_generate(f"<<Plot{self.task_name}>>")
+
+    def get_parameters(self):
+        pop_dict = {
+            'task': self.task_name,
+            'num_occupied_mo': self.occupied_mo.get(),
+            'num_unoccpied_mo': self.unoccupied_mo.get(),
+            'bandpass_window': self.bandpass.get(),
+            'hanning_window' : self.hanning.get()
+        }
+
+        return pop_dict
+
+    def get_plot_parameters(self):
+        plot_param = {
+            'ngrid' : self.ngrid.get(),
+            'broadening' : self.broadening.get()
+        }
+        return plot_param
 
 class JobSubPage(ttk.Frame):
     """ Creates widgets for JobSub Page"""
@@ -1854,3 +1891,42 @@ class JobSubPage(ttk.Frame):
           'remote_path':self.rpath.get(),
             } 
         return network_job_dict
+
+
+####### popup filemenu #########
+
+class CreateProjectPage(Toplevel):
+
+    def __init__(self, parent, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+
+        self._default_var = {
+              'proj_path' : ['str'],
+              'proj_name' : ['str'],
+              
+          }
+
+        self._var = var_define(self._default_var)
+        self.attributes("-topmost", True)
+        self.grab_set()
+        self.lift()
+        self.title("Create New Project")     
+        self.geometry("550x200")
+
+        self.label_proj = Label(self,text="Project Name",bg=label_design['bg'],fg=label_design['fg'])
+        self.label_proj['font'] = label_design['font']
+        self.label_proj.grid(column=0, row= 3, sticky=tk.W,  pady=10, padx=10)  
+
+        self.entry_proj = Entry(self,textvariable=self._var['proj_name'])
+        self.entry_proj['font'] = myfont()
+        self.entry_proj.grid(column=1, row= 3, sticky=tk.W)
+        self.entry_proj.delete(0, tk.END)
+
+        self.button_project = Button(self,text="Create New Project",width=18, activebackground="#78d6ff",command= lambda :self.event_generate('<<CreateNewProject>>'))
+        self.button_project['font'] = myfont()
+        self.button_project.grid(column=2, row= 3, sticky=tk.W, padx= 10, pady=10)  
+            
+    def get_value(self, key):
+        return self._var[key].get()
+
+    
