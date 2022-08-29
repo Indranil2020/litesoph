@@ -106,7 +106,7 @@ class WorkManagerPage(ttk.Frame):
     MainTask = ["Preprocessing Jobs","Simulations","Postprocessing Jobs"]
     Pre_task = ["Ground State"]
     Sim_task = ["Delta Kick","Gaussian Pulse"]
-    Post_task = ["Compute Spectrum","Kohn Sham Decomposition","Population Correlation","Induced Density Analysis","Generalised Plasmonicity Index", "Plot"]
+    Post_task = ["Compute Spectrum","Kohn Sham Decomposition","Population Tracking","Induced Density Analysis","Generalised Plasmonicity Index", "Plot"]
     engine_list = ['auto-mode','gpaw', 'nwchem', 'octopus']
 
     def __init__(self, parent, *args, **kwargs):
@@ -711,13 +711,6 @@ class TimeDependentPage(View):
         self.entry_strength.grid(row=2, column=1)
         self._var['strength'].set('01e-05')
 
-        # inval = ["1e-5", "1e-4", "1e-3"]
-        # self.entry_inv = ttk.Combobox(
-        #     self.input_param_frame, textvariable=self._var['strength'], value=inval)
-        # self.entry_inv['font'] = myFont
-        # self.entry_inv.grid(row=2, column=1)
-        # self.entry_inv['state'] = 'readonly'
-
         self.label_proj = tk.Label(
             self.input_param_frame, text="Propagation time step (in attosecond)", bg="gray", fg="black")
         self.label_proj['font'] = myFont
@@ -797,29 +790,16 @@ class TimeDependentPage(View):
     def get_parameters(self):
         from litesoph.utilities.units import as_to_au
         self.pol_list = self.get_pol_list()
-        kick = [float(self._var['strength'].get())*float(self.pol_list[0]),
-                float(self._var['strength'].get())*float(self.pol_list[1]),
-                float(self._var['strength'].get())*float(self.pol_list[2])]
-        inp_list = [float(self._var['dt'].get()),int(self._var['Nt'].get())]
 
-        td_dict_gp = {
-            'absorption_kick':kick,
-            'analysis_tools':self.get_property_list(),
-            'propagate': tuple(inp_list),
-            'pol_dir': self.read_pol_dir(),
-            'output_freq': self._var['output_freq'].get()
+        td_dict = {
+            'strength': self._var['strength'].get(),
+            'polarization' : self.get_pol_list(),
+            'time_step' : self._var['dt'].get(),
+            'number_of_steps' : self._var['Nt'].get(),
+            'output_freq': self._var['output_freq'].get(),
+            'properties' : self.get_property_list()
         }
-
-        # td_dict_oct = {
-        #     'max_step' : self._var['Nt'].get() ,
-        #     'time_step' : self._var['dt'].get(),
-        #     'td_propagator' : 'aetrs',
-        #     'strength': self._var['strength'].get(),
-        #     'e_pol': self.pol_list,
-        #     'pol_dir': self.read_pol_dir(),
-        #     'output_freq': self._var['output_freq'].get(),
-        #     'analysis_tools': self.get_property_list()
-        #   }
+        # Move this engine specfic dict to their respective engine task
         td_dict_oct = {
             "CalculationMode": 'td',
             "TDMaxSteps" : self._var['Nt'].get() ,
@@ -831,29 +811,18 @@ class TimeDependentPage(View):
             "TDOutput": self.get_td_out()
           }
 
-        if self.engine == 'gpaw':
-            return td_dict_gp
-        elif self.engine == 'nwchem':
-            td_dict_nwchem = {
-            'task':'rt_tddft_delta',
-            'rt_tddft':{'tmax': round(self._var['Nt'].get() * self._var['dt'].get() * as_to_au,2),
-                        'dt': round(self._var['dt'].get() * as_to_au, 2),
-                        'field':{'name': 'kick_' + self.read_pol_dir()[1],
-                                'type': 'delta',
-                                'polarization':self.read_pol_dir()[1],
-                                'max':self._var['strength'].get()},
-            'print':self.out_print()}}
-            return td_dict_nwchem
-        elif self.engine == 'octopus':
+        if self.engine == 'octopus':
             return td_dict_oct
+        else:
+            return td_dict
 
     def get_property_list(self):
-        prop_list = []
+        prop_list = ['spectrum']
                
         if self._var['ksd'].get() == 1:
             prop_list.append("ksd")
         if self._var['popln'].get() == 1:
-            prop_list.append("population_correlation")    
+            prop_list.append("mo_population")    
         return prop_list   
 
     def get_td_out(self):
@@ -866,12 +835,6 @@ class TimeDependentPage(View):
         if any(td_occup):
             td_out_list.append(["td_occup"])
         return td_out_list
-        
-    def out_print(self):
-        p_list = ['dipole'] 
-        if self._var['popln'].get() == 1 :
-            p_list.append('moocc')
-        return p_list
 
     def set_label_msg(self,msg):
         show_message(self.label_msg, msg)
@@ -897,18 +860,17 @@ class TimeDependentPage(View):
         if engn == 'gpaw':
             self.update_var(self.gpaw_td_default)
             self.checkbox_ksd.config(state= 'active')
-            self.checkbox_pc.config(state = 'disabled')
+            self.checkbox_pc.config(state = 'active')
 
         elif engn == 'octopus':
             self.update_var(self.oct_td_default)
-            # self._var['ksd'].set(0)
-            # self.checkbox_ksd.config(state = 'disabled')
-            self.checkbox_pc.config(state = 'disabled')
-
+            self.checkbox_ksd.config(state= 'active')
+            self.checkbox_pc.config(state = 'active')
+            
         elif engn == 'nwchem':            
             self.update_var(self.nwchem_td_default)
             self.checkbox_ksd.config(state='disabled')
-
+            self.checkbox_ksd.set(0)
 
 class LaserDesignPage(View):
 
@@ -983,16 +945,6 @@ class LaserDesignPage(View):
         self.entry_strength.grid(row=3, column=1)
         self.strength.set('01e-05')
         
-        # print(self.strength.get())
-        # self.entry_strength['state'] = 'readonly'
-    
-        # instr = ["1e-5","1e-4","1e-3"]
-        # self.entry_strength = ttk.Combobox(self.Frame2,textvariable= self.strength, value = instr)
-        # self.entry_strength['font'] = myFont
-        # self.entry_strength.current(0)
-        # self.entry_strength.grid(row=3, column=1)
-        # self.entry_strength['state'] = 'readonly'
-
         self.label_fwhm = tk.Label(self.Frame2,text="Full Width Half Max (FWHM in eV)",bg="gray",fg="black")
         self.label_fwhm['font'] = myFont
         self.label_fwhm.grid(row=4, column=0, sticky='w', padx=5, pady=5)
@@ -1104,52 +1056,33 @@ class LaserDesignPage(View):
     def set_laser_design_dict(self, l_dict:dict):
         self.laser_design_dict = l_dict
 
+    def get_property_list(self):
+        p = ['spectrum']
+        if self.ksd_var.get() == 1:
+            p.append('ksd')
+        if self.popln_var.get() == 1:
+            p.append('mo_population')
+        return p
+
     def get_parameters(self):
         
-        from litesoph.utilities.units import au_to_fs,autime_to_eV, as_to_au
+        from litesoph.utilities.units import as_to_au
         laser_param = self.laser_design_dict 
         self.pol_list, pol = self.get_pol_list()              
-        # epol_list = [int(self.pol_x.get()),int(self.pol_y.get()),int(self.pol_z.get())]
-       
-        if self.engine == 'gpaw':
-            abs_x = float(self.strength.get())*float(self.pol_list[0])
-            abs_y = float(self.strength.get())*float(self.pol_list[1])
-            abs_z = float(self.strength.get())*float(self.pol_list[2])
-            abs_list = [abs_x, abs_y, abs_z]
-            inp_list = [float(self.ts.get()),int(self.ns.get())]
-            analysis_tools= ['dipole']
-            if self.ksd_var.get() == 1:
-                analysis_tools.append('wavefunction')
-            if self.popln_var.get() == 1:
-                analysis_tools.append('population')
 
-            l_dict ={
-                'frequency':self.frequency.get(),
-                'strength':self.strength.get(),
-                'sigma': round(autime_to_eV/self.laser_design_dict['sigma'], 2),
-                'time0': round(self.laser_design_dict['time0']*au_to_fs, 2)
-            }
-            laser_param.update(l_dict)
-            td_gpaw = {
-                        'absorption_kick' :abs_list,
-                        'propagate': tuple(inp_list),
-                        'electric_pol': self.pol_list,             
-                        'td_potential' : True,                     
-                        'laser': laser_param,
-                        'analysis_tools': analysis_tools,
-                        'output_freq': self.output_freq.get()}
-            # print(td_gpaw)            
-            return td_gpaw
-            
-        elif self.engine == 'octopus':
-            # td_oct = {  'e_pol' :self.pol_list,
-            #             'max_step' : self.ns.get(),
-            #             'time_step': self.ts.get(),
-            #             'strength' : self.strength.get(),
-            #             'time0' :laser_param['time0'],
-            #             'sigma' : laser_param['sigma'],
-            #             'frequency': self.frequency.get()
-            #         }
+        td_dict = {
+            'strength': self.strength.get(),
+            'polarization' : self.pol_list,
+            'time_step' : self.ts.get(),
+            'number_of_steps' : self.ns.get(),
+            'output_freq': self.output_freq.get(),
+            'properties' : self.get_property_list(),
+            'laser': laser_param
+        }
+        
+        
+        # Move this engine specfic dict to their respective engine task
+        if self.engine == 'octopus':
             td_oct = { 
                 'CalculationMode': 'td', 
                 'TDPropagator': 'aetrs',
@@ -1165,25 +1098,9 @@ class LaserDesignPage(View):
                                     str('"'+"envelope_gauss"+'"')
                                     ]]
                     }
-            # print(td_oct)            
             return td_oct        
-                      
-        elif self.engine == 'nwchem':
-            from litesoph.utilities.units import as_to_au
-            
-            td_nwchem = {
-            'task':'rt_tddft_delta',
-            'rt_tddft':{'tmax': round(self.ns.get() * self.ts.get() * as_to_au,2),
-                        'dt': round(self.ts.get() * as_to_au, 2),
-                        'field':{'name': 'gpulse_' + pol,
-                                'type': 'gaussian',
-                                'frequency' : self.frequency.get(),
-                                'center': laser_param['time0'],
-                                'width': laser_param['sigma'],
-                                'polarization':pol,
-                                'max':self.strength.get()},
-            'print': ['dipole', 'moocc' if self.popln_var.get() == 1 else '']}}
-            return td_nwchem
+        else:
+            return td_dict       
 
     def back_button(self):
         self.event_generate(actions.SHOW_WORK_MANAGER_PAGE)
@@ -1341,18 +1258,13 @@ class PlotSpectraPage(ttk.Frame):
 
 
     def get_parameters(self):
-        td_dict_gp = {
-            'del_e':self._var['del_e'].get(),
+        
+        plot_dict = {
+            'delta_e':self._var['del_e'].get(),
             'e_max':self._var['e_max'].get(),
             'e_min': self._var['e_min'].get()       
         }
-        
-        # td_dict_oct = {
-        #     'del_e':self._var['del_e'].get(),
-        #     'e_max':self._var['e_max'].get(),
-        #     'e_min': self._var['e_min'].get()
-        #   }
-        
+        # Move this engine specfic dict to their respective engine task
         td_dict_oct = {
             "UnitsOutput": 'eV_angstrom',
             "PropagationSpectrumEnergyStep": str(self._var['del_e'].get())+"*eV",
@@ -1360,18 +1272,10 @@ class PlotSpectraPage(ttk.Frame):
             "PropagationSpectrumMinEnergy": str(self._var['e_min'].get())+"*eV"
           }
         
-        if self.engine == 'gpaw':
-            return td_dict_gp
-        elif self.engine == 'nwchem':
-            td_dict_nwchem = {
-            'task': 'spectrum',
-            'del_e':self._var['del_e'].get(),
-            'e_max':self._var['e_max'].get(),
-            'e_min': self._var['e_min'].get()
-            }
-            return td_dict_nwchem
-        elif self.engine == 'octopus':
-            return td_dict_oct            
+        if self.engine == 'octopus':
+            return td_dict_oct
+        else:
+            return plot_dict            
 
 class TcmPage(ttk.Frame):
 
@@ -1542,16 +1446,21 @@ class TcmPage(ttk.Frame):
             return gpaw_ksd_dict
 
         elif engine == 'octopus':
-
             oct_ksd_dict = {
-            'ni': self.ni.get(),
-            'na': self.na.get(),
-            'fmin': self.wmin.get(),
-            'fmax': self.wmax.get(),
-            'axis_limit': self.axis_limit.get()
+            'task': 'tcm',
+            'num_occupied_mo': self.ni.get(),
+            'num_unoccupied_mo': self.na.get(),            
+            'output': ['DMAT', 'POP']
         } 
-
             return oct_ksd_dict                
+
+    def get_plot_parameters(self):
+        oct_ksd_plot_dict ={
+        'fmin': self.wmin.get(),
+        'fmax': self.wmax.get(),
+        'axis_limit': self.axis_limit.get()}
+        return oct_ksd_plot_dict
+
 
 class PopulationPage(View):
     def __init__(self, parent, engine,task_name, *args, **kwargs):
@@ -1562,8 +1471,11 @@ class PopulationPage(View):
         
         self.bandpass = tk.IntVar(value=100)
         self.hanning = tk.IntVar(value= 50)
-        self.occupied_mo = tk.IntVar()
-        self.unoccupied_mo = tk.IntVar()
+        self.occupied_mo = tk.IntVar(value=1)
+        self.unoccupied_mo = tk.IntVar(value=1)
+        self.plot_option = tk.IntVar(value=1)
+        self.occupied_mo_plot = tk.IntVar(value=1)
+        self.unoccupied_mo_plot = tk.IntVar(value=1)
         self.ngrid = tk.IntVar(value=100)
         self.broadening = tk.DoubleVar(value= 0.5)
 
@@ -1575,7 +1487,7 @@ class PopulationPage(View):
 
         self.Frame_button1 = self.save_button_frame 
 
-        self.Frame1_label_path = tk.Label(self.SubFrame1,text="LITESOPH Input for Population Correlation", fg='blue')
+        self.Frame1_label_path = tk.Label(self.SubFrame1,text="LITESOPH Input for Population Tracking", fg='blue')
         self.Frame1_label_path['font'] = myfont()
         self.Frame1_label_path.grid(row=0, column=0, padx=5, pady=10)
 
@@ -1595,41 +1507,62 @@ class PopulationPage(View):
         self.entry_na['font'] = myfont()
         self.entry_na.grid(row=2, column=1)
 
-        self.label_bandpass = tk.Label(self.SubFrame1,text="Bandpass",bg= label_design['bg'],fg=label_design['fg'], justify='left')
-        self.label_bandpass['font'] = myfont()
-        self.label_bandpass.grid(row=3, column=0, sticky='w', padx=5, pady=5)
+        # self.label_bandpass = tk.Label(self.SubFrame1,text="Bandpass",bg= label_design['bg'],fg=label_design['fg'], justify='left')
+        # self.label_bandpass['font'] = myfont()
+        # self.label_bandpass.grid(row=3, column=0, sticky='w', padx=5, pady=5)
 
-        self.entry_bandpass = Onlydigits(self.SubFrame1, textvariable= self.bandpass, width=5)
-        self.entry_bandpass['font'] = myfont()
-        self.entry_bandpass.grid(row=3, column=1)
+        # self.entry_bandpass = Onlydigits(self.SubFrame1, textvariable= self.bandpass, width=5)
+        # self.entry_bandpass['font'] = myfont()
+        # self.entry_bandpass.grid(row=3, column=1)
         
-        self.label_hanning = tk.Label(self.SubFrame1,text="Hanning",bg= label_design['bg'],fg=label_design['fg'], justify='left')
-        self.label_hanning['font'] = myfont()
-        self.label_hanning.grid(row=4, column=0, sticky='w', padx=5, pady=5)
+        # self.label_hanning = tk.Label(self.SubFrame1,text="Hanning",bg= label_design['bg'],fg=label_design['fg'], justify='left')
+        # self.label_hanning['font'] = myfont()
+        # self.label_hanning.grid(row=4, column=0, sticky='w', padx=5, pady=5)
 
-        self.entry_hanning = Onlydigits(self.SubFrame1, textvariable= self.hanning, width=5)
-        self.entry_hanning['font'] = myfont()
-        self.entry_hanning.grid(row=4, column=1)
+        # self.entry_hanning = Onlydigits(self.SubFrame1, textvariable= self.hanning, width=5)
+        # self.entry_hanning['font'] = myfont()
+        # self.entry_hanning.grid(row=4, column=1)
 
         self.label_plot = tk.Label(self.SubFrame2,text="Plotting Parameters", fg='blue')
         self.label_plot['font'] = myfont()
         self.label_plot.grid(row=0, column=0, padx=5, pady=10)
 
-        self.Label_grid = tk.Label(self.SubFrame2,text="Number of mesh grids",bg= label_design['bg'],fg=label_design['fg'], justify='left')
-        self.Label_grid['font'] = myfont()
-        self.Label_grid.grid(row=1, column=0, sticky='w', padx=5, pady=5)        
+        # self.Label_grid = tk.Label(self.SubFrame2,text="Number of mesh grids",bg= label_design['bg'],fg=label_design['fg'], justify='left')
+        # self.Label_grid['font'] = myfont()
+        # self.Label_grid.grid(row=1, column=0, sticky='w', padx=5, pady=5)        
         
-        self.entry_grid = Onlydigits(self.SubFrame2, textvariable= self.ngrid, width=5)
-        self.entry_grid['font'] = myfont()
-        self.entry_grid.grid(row=1, column=1, sticky='w', padx=5, pady=5)
+        # self.entry_grid = Onlydigits(self.SubFrame2, textvariable= self.ngrid, width=5)
+        # self.entry_grid['font'] = myfont()
+        # self.entry_grid.grid(row=1, column=1, sticky='w', padx=5, pady=5)
         
-        self.Label_width = tk.Label(self.SubFrame2,text="Broadening width",bg= label_design['bg'],fg=label_design['fg'], justify='left')
-        self.Label_width['font'] = myfont()
-        self.Label_width.grid(row=2, column=0, sticky='w', padx=5, pady=5)        
+        # self.Label_width = tk.Label(self.SubFrame2,text="Broadening width",bg= label_design['bg'],fg=label_design['fg'], justify='left')
+        # self.Label_width['font'] = myfont()
+        # self.Label_width.grid(row=2, column=0, sticky='w', padx=5, pady=5)        
         
-        self.entry_width = Onlydigits(self.SubFrame2, textvariable= self.broadening, width=5)
-        self.entry_width['font'] = myfont()
-        self.entry_width.grid(row=2, column=1, sticky='w', padx=5, pady=5)
+        # self.entry_width = Onlydigits(self.SubFrame2, textvariable= self.broadening, width=5)
+        # self.entry_width['font'] = myfont()
+        # self.entry_width.grid(row=2, column=1, sticky='w', padx=5, pady=5)
+
+        values = {"All States": 0, "Select the states": 1}
+        for (text, value) in values.items():
+            tk.Radiobutton(self.SubFrame2, text=text, variable=self.plot_option, font=myfont2(),
+             justify='left',value=value).grid(row=value+1, column=0, ipady=5, sticky='w')   
+
+        self.Label_ni_to_plot = tk.Label(self.SubFrame2,text="Number of occupied states(HOMO & below)",bg= label_design['bg'],fg=label_design['fg'], justify='left')
+        self.Label_ni_to_plot['font'] = myfont()
+        self.Label_ni_to_plot.grid(row=3, column=0, sticky='w', padx=5, pady=5)        
+        
+        self.entry_ni_to_plot = Onlydigits(self.SubFrame2, textvariable= self.occupied_mo_plot, width=5)
+        self.entry_ni_to_plot['font'] = myfont()
+        self.entry_ni_to_plot.grid(row=3, column=1)
+
+        self.Label_na_to_plot = tk.Label(self.SubFrame2,text="Number of unoccupied states(LUMO & above)",bg= label_design['bg'],fg=label_design['fg'], justify='left')
+        self.Label_na_to_plot['font'] = myfont()
+        self.Label_na_to_plot.grid(row=4, column=0, sticky='w', padx=5, pady=5)        
+        
+        self.entry_na_to_plot = Onlydigits(self.SubFrame2, textvariable= self.unoccupied_mo_plot, width=5)
+        self.entry_na_to_plot['font'] = myfont()
+        self.entry_na_to_plot.grid(row=4, column=1)
 
         self.submit_button = tk.Button(self.SubFrame1, text="Submit",activebackground="#78d6ff", command=self._on_submit)
         self.submit_button['font'] = myfont()
@@ -1637,13 +1570,14 @@ class PopulationPage(View):
 
         self.plot_button = tk.Button(self.SubFrame2, text="Plot",activebackground="#78d6ff", command=self._on_plot)
         self.plot_button['font'] = myfont()
-        self.plot_button.grid(row=2, column=2, sticky='we', padx=25)
+        self.plot_button.grid(row=4, column=2, sticky='we', padx=25)
 
         self.back_button = tk.Button(self.Frame_button1, text="Back ",activebackground="#78d6ff", command=lambda : self.event_generate(actions.SHOW_WORK_MANAGER_PAGE))
         self.back_button['font'] = myfont()
         self.back_button.grid(row=0, column=0, padx=10, sticky='nswe')
 
         # add_job_frame(self, self.SubFrame3,self.task_name, row= 0, column=1)
+
     def _on_submit(self):
         self.event_generate(f"<<SubLocal{self.task_name}>>")
 
@@ -1654,18 +1588,22 @@ class PopulationPage(View):
         pop_dict = {
             'task': self.task_name,
             'num_occupied_mo': self.occupied_mo.get(),
-            'num_unoccpied_mo': self.unoccupied_mo.get(),
-            'bandpass_window': self.bandpass.get(),
-            'hanning_window' : self.hanning.get()
+            'num_unoccupied_mo': self.unoccupied_mo.get(),
+            # 'bandpass_window': self.bandpass.get(),
+            # 'hanning_window' : self.hanning.get()
         }
 
         return pop_dict
 
     def get_plot_parameters(self):
+       
         plot_param = {
-            'ngrid' : self.ngrid.get(),
-            'broadening' : self.broadening.get()
-        }
+            'num_occupied_mo_plot': self.occupied_mo_plot.get(),
+            'num_unoccupied_mo_plot': self.unoccupied_mo_plot.get(),
+            # 'ngrid' : self.ngrid.get(),
+            # 'broadening' : self.broadening.get()
+        } 
+
         return plot_param
 
 class JobSubPage(ttk.Frame):
